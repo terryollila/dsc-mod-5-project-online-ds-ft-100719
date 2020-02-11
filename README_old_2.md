@@ -3,11 +3,15 @@
 
 Please fill out:
 * Student name: Terry Ollila
-* Student pace: full time
-* Scheduled project review date/time: 2/11/2019 12pm
+* Student pace: self paced / part time / X full time
+* Scheduled project review date/time: 
 * Instructor name: James Irving
-* Blog post URL: https://terryollila.github.io/repetitive_model_fitting_in_classification
+* Blog post URL:
 
+
+Depression and anxiety as classified as mental illness and severe enough to impare activities.
+
+This report is not intended to be a guide for avoiding or relieving mental illness, but but a tool to identify potential warning signs and to investigate societal factors.
 
 # Premise
 
@@ -52,6 +56,43 @@ random.seed(42)
 import warnings
 warnings.filterwarnings("ignore")
 ```
+
+
+```python
+plt.style.available
+```
+
+
+
+
+    ['seaborn-dark',
+     'seaborn-darkgrid',
+     'seaborn-ticks',
+     'fivethirtyeight',
+     'seaborn-whitegrid',
+     'classic',
+     '_classic_test',
+     'fast',
+     'seaborn-talk',
+     'seaborn-dark-palette',
+     'seaborn-bright',
+     'seaborn-pastel',
+     'grayscale',
+     'seaborn-notebook',
+     'ggplot',
+     'seaborn-colorblind',
+     'seaborn-muted',
+     'seaborn',
+     'Solarize_Light2',
+     'seaborn-paper',
+     'bmh',
+     'tableau-colorblind10',
+     'seaborn-white',
+     'dark_background',
+     'seaborn-poster',
+     'seaborn-deep']
+
+
 
 
 ```python
@@ -581,7 +622,7 @@ cat_scatter(cdc_combined['YEARS_WORKED'], test_target, cut_last=True)
 ```
 
 
-![png](output_44_0.png)
+![png](output_46_0.png)
 
 
 
@@ -590,7 +631,7 @@ cat_scatter(cdc_combined['AGE'], test_target)
 ```
 
 
-![png](output_45_0.png)
+![png](output_47_0.png)
 
 
 
@@ -599,7 +640,7 @@ cat_scatter(cdc_combined['VIGOROUS_ACTIVITY'], test_target, cut_last=True)
 ```
 
 
-![png](output_46_0.png)
+![png](output_48_0.png)
 
 
 
@@ -608,7 +649,7 @@ cat_scatter(cdc_combined['MODERATE_ACTIVITY'], test_target, cut_last=True)
 ```
 
 
-![png](output_47_0.png)
+![png](output_49_0.png)
 
 
 
@@ -617,7 +658,7 @@ cat_scatter(cdc_combined['ALCOHOL_PER_DAY_DRANK'], test_target, cut_last=True)
 ```
 
 
-![png](output_48_0.png)
+![png](output_50_0.png)
 
 
 
@@ -626,7 +667,7 @@ cat_scatter(cdc_combined['BMI_BIN'], test_target)
 ```
 
 
-![png](output_49_0.png)
+![png](output_51_0.png)
 
 
 
@@ -635,7 +676,7 @@ cat_scatter(cdc_combined['WEB_HOURS'], test_target, cut_last=True)
 ```
 
 
-![png](output_50_0.png)
+![png](output_52_0.png)
 
 
 ## Establish Best Features
@@ -678,8 +719,6 @@ best_features_rfc = find_important_features(you_dummies, test_target,
     Best Parameter Combination Found During Grid Search:
     {'criterion': 'gini', 'max_depth': 7, 'max_features': 30, 'min_samples_leaf': 2, 'min_samples_split': 20}
 
-
-Creating a correlation matrix in order to establish pos/neg metrics for the most important features.
 
 
 ```python
@@ -1062,8 +1101,6 @@ corr_dummies
 </div>
 
 
-
-The below cell translates the feature names into sensible descriptions for plotting.
 
 
 ```python
@@ -1709,69 +1746,63 @@ test = tree_builder(tiny_test[:26311], test_target, params=best_params_xg,
 
 ## Main Target: Depression/Anxiety Duration
 
-### Decision Tree Classifier
+### XGBoost Model with Grid Search
 
 
 ```python
+# Create a spectrum of values to test against.
 grid = {'criterion': ['gini', 'entropy'],
-        'max_depth': [2,3,6,7,8],
-        'min_samples_split': [2,5,10,15,20,30],
-        'min_samples_leaf': [2,5,10,15,20,30],
-        'max_features': [20,30,50,100]} 
+        'max_depth': [3,6,7,8],
+        'max_features': [30,50,200],
+        'gamma': [5,10,15,20],
+        'max_features': [30,50,300]} 
+
+# grid_search function returns the params to be used in the model.
+best_params_xg = grid_search(XGBClassifier, trim_dummies, test_target, grid,
+                          verbose=False, n_estimators=50, scoring='accuracy')
 ```
 
-
-```python
-best_params_dtc = grid_search(DecisionTreeClassifier, trim_dummies, test_target, 
-                          grid, verbose=False)
-```
-
-    Mean Training Score: 72.74%
-    Mean Test Score: 68.00%
+    Mean Training Score: 76.23%
+    Mean Test Score: 71.71%
     Best Parameter Combination Found During Grid Search:
-    {'criterion': 'entropy', 'max_depth': 8, 'max_features': 30, 'min_samples_leaf': 15, 'min_samples_split': 10}
+    {'criterion': 'gini', 'gamma': 5, 'max_depth': 3, 'max_features': 30}
 
 
 
 ```python
-tree_builder(trim_dummies, test_target, params=best_params_dtc)
+# This is the function that creates the modeling and plotting.
+best_features = tree_builder(trim_dummies, test_target, params=best_params_xg,
+             classifier=XGBClassifier)
 ```
 
-    Train Accuracy:  0.6626970050169766
-    Test Accuracy:  0.6606871389480086
-    Precision:  0.0508916920400174
-    Recall:  0.7005988023952096
-    f1_score:  0.09489051094890512
+    Train Accuracy:  0.716566158212132
+    Test Accuracy:  0.7170872605655214
+    Precision:  0.060228452751817235
+    Recall:  0.6946107784431138
+    f1_score:  0.11084567606306736
     
-    AUC is :0.68
+    AUC is :0.71
 
 
 
-![png](output_77_1.png)
+![png](output_76_1.png)
 
 
-    FSNAP_2                  0.202019
-    WRKLYR4_2                0.083993
-    MBO_SPR1_1               0.079041
-    ONEJOB_0                 0.062988
-    MBO_MND1_1               0.046803
-    FSRUNOUT_3               0.045223
-    MRACRPI2_1               0.037444
-    MODERATE_ACTIVITY_100    0.035658
-    ASISIF_0                 0.029627
-    FM_SIZE_1                0.026986
-    dtype: float64
-
-
-
-![png](output_77_3.png)
+    WRKLYR4_0     0.076152
+    FSRUNOUT_3    0.069124
+    INCGRP5_1     0.052336
+    FM_ELDR_2     0.043366
+    FSNAP_2       0.034605
+    ASINBILL_4    0.031904
+    CIGSDAY_0     0.027383
+    MBO_MND1_1    0.027180
+    FM_ELDR_0     0.025769
+    ASINBILL_1    0.024286
+    dtype: float32
 
 
 
-
-
-![png](output_77_4.png)
-
+![png](output_76_3.png)
 
 
 ### Random Forest Model with Grid Search
@@ -1814,7 +1845,7 @@ best_features_rfc = tree_builder(trim_dummies, test_target,
 
 
 
-![png](output_81_1.png)
+![png](output_80_1.png)
 
 
     ONEJOB_0      0.048666
@@ -1831,66 +1862,111 @@ best_features_rfc = tree_builder(trim_dummies, test_target,
 
 
 
-![png](output_81_3.png)
+![png](output_80_3.png)
 
 
-### XGBoost Model with Grid Search
+### Decision Tree Classifier
 
 
 ```python
-# Create a spectrum of values to test against.
 grid = {'criterion': ['gini', 'entropy'],
-        'max_depth': [3,6,7,8],
-        'max_features': [30,50,200],
-        'gamma': [5,10,15,20],
-        'max_features': [30,50,300]} 
-
-# grid_search function returns the params to be used in the model.
-best_params_xg = grid_search(XGBClassifier, trim_dummies, test_target, grid,
-                          verbose=False, n_estimators=50, scoring='accuracy')
+        'max_depth': [2,3,6,7,8],
+        'min_samples_split': [2,5,10,15,20,30],
+        'min_samples_leaf': [2,5,10,15,20,30],
+        'max_features': [20,30,50,100]} 
 ```
 
-    Mean Training Score: 76.23%
-    Mean Test Score: 71.71%
+
+```python
+best_params_dtc = grid_search(DecisionTreeClassifier, trim_dummies, test_target, 
+                          grid, verbose=False)
+```
+
+    Mean Training Score: 72.74%
+    Mean Test Score: 68.00%
     Best Parameter Combination Found During Grid Search:
-    {'criterion': 'gini', 'gamma': 5, 'max_depth': 3, 'max_features': 30}
+    {'criterion': 'entropy', 'max_depth': 8, 'max_features': 30, 'min_samples_leaf': 15, 'min_samples_split': 10}
 
 
 
 ```python
-# This is the function that creates the modeling and plotting.
-best_features = tree_builder(trim_dummies, test_target, params=best_params_xg,
-             classifier=XGBClassifier)
+tree_builder(trim_dummies, test_target, params=best_params_dtc)
 ```
 
-    Train Accuracy:  0.716566158212132
-    Test Accuracy:  0.7170872605655214
-    Precision:  0.060228452751817235
-    Recall:  0.6946107784431138
-    f1_score:  0.11084567606306736
+    Train Accuracy:  0.6626970050169766
+    Test Accuracy:  0.6606871389480086
+    Precision:  0.0508916920400174
+    Recall:  0.7005988023952096
+    f1_score:  0.09489051094890512
     
-    AUC is :0.71
+    AUC is :0.68
 
 
 
 ![png](output_84_1.png)
 
 
-    WRKLYR4_0     0.076152
-    FSRUNOUT_3    0.069124
-    INCGRP5_1     0.052336
-    FM_ELDR_2     0.043366
-    FSNAP_2       0.034605
-    ASINBILL_4    0.031904
-    CIGSDAY_0     0.027383
-    MBO_MND1_1    0.027180
-    FM_ELDR_0     0.025769
-    ASINBILL_1    0.024286
-    dtype: float32
+    FSNAP_2                  0.202019
+    WRKLYR4_2                0.083993
+    MBO_SPR1_1               0.079041
+    ONEJOB_0                 0.062988
+    MBO_MND1_1               0.046803
+    FSRUNOUT_3               0.045223
+    MRACRPI2_1               0.037444
+    MODERATE_ACTIVITY_100    0.035658
+    ASISIF_0                 0.029627
+    FM_SIZE_1                0.026986
+    dtype: float64
 
 
 
 ![png](output_84_3.png)
+
+
+
+
+
+![png](output_84_4.png)
+
+
+
+### K Nearest Neighbors
+
+
+```python
+# Backup params in case I don't want to re-run grid search.
+# knn_params = {'n_neighbors': [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]}
+```
+
+
+```python
+best_params_knn = grid_search(KNeighborsClassifier, trim_dummies, test_target,
+                          knn_params, verbose=False, scoring='recall')
+```
+
+    Mean Training Score: 67.32%
+    Mean Test Score: 62.87%
+    Best Parameter Combination Found During Grid Search:
+    {'n_neighbors': 17}
+
+
+
+```python
+tree_builder(trim_dummies, test_target, params=best_params_knn,
+             classifier=KNeighborsClassifier)
+```
+
+    Train Accuracy:  0.7788476156691836
+    Test Accuracy:  0.766798418972332
+    Precision:  0.06658211794546608
+    Recall:  0.6287425149700598
+    f1_score:  0.12041284403669725
+    
+    AUC is :0.7
+
+
+
+![png](output_88_1.png)
 
 
 ### Support Vector Classifier
@@ -1942,57 +2018,18 @@ tree_builder(trim_dummies, test_target, params=best_params_svc,
 
 
 
-![png](output_91_1.png)
-
-
-
-![png](output_91_2.png)
-
-
-### K Nearest Neighbors
-
-
-```python
-# Backup params in case I don't want to re-run grid search.
-# knn_params = {'n_neighbors': [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]}
-```
-
-
-```python
-best_params_knn = grid_search(KNeighborsClassifier, trim_dummies, test_target,
-                          knn_params, verbose=False, scoring='recall')
-```
-
-    Mean Training Score: 67.32%
-    Mean Test Score: 62.87%
-    Best Parameter Combination Found During Grid Search:
-    {'n_neighbors': 17}
-
-
-
-```python
-tree_builder(trim_dummies, test_target, params=best_params_knn,
-             classifier=KNeighborsClassifier)
-```
-
-    Train Accuracy:  0.7788476156691836
-    Test Accuracy:  0.766798418972332
-    Precision:  0.06658211794546608
-    Recall:  0.6287425149700598
-    f1_score:  0.12041284403669725
-    
-    AUC is :0.7
-
-
-
 ![png](output_95_1.png)
+
+
+
+![png](output_95_2.png)
 
 
 ## Side Targets
 
 I did a few additional targets on other subjects to find out if there was anything worthwhile.
 
-There wasn't really much here, but I'm keeping it in as a means of demonstrating repeatability. The functions I've created make displaying a fairly complete analysis of each target very simple to do. 
+There wasn't.
 
 ### Bipolar, Schizophrenia etc.
 
@@ -2066,7 +2103,7 @@ tree_builder(trim_dummies, target_bi, params=best_params_svc,
 
 ### Kidney Problems
 
-Another small sample size, such that no conclusions could be found.
+Another small sample size. 
 
 
 ```python
@@ -2121,7 +2158,7 @@ tree_builder(trim_dummies, target_kid, params=best_params_svc,
 
 ### Heavy Drinking
 
-Not sure why this one didn't work out, aside from the fact that the data set was culled with mental illness in mind rather than drinking, but many of the features should have been the same. Something I would have explored with more time, but it wasn't the primary interest.
+Not sure why this one didn't work out, aside from the fact that the data set was culled with mental illness in mind, but many of the features should have been the same. Something I would have explored with more time, but it wasn't the primary interest.
 
 
 ```python
@@ -2220,15 +2257,13 @@ tree_builder(trim_dummies, target_alc, params=best_params_svc,
 
 ## Summary
 
-There were five models generated for the target data of individuals classified as having dibilitating depression or anxiety. The decision tree was the first, as it was an easy model from which to pull robust metrics and visuals. The results were fine but not fantastic. The next model was the random forest, which definitely improved the output figures. A natural progression led to the XGBoost model, which made further improvments still. It was followed up with the Support Vector Classifier, which was the model I identified for the best model for my purposes. After that came the K Nearest Neighbors model, which actually had a higher accuracy, but the the AUC was higher on the SVC, and recall was superior, which I felt was important in maximizing positive hits as opposed with avoiding false positives. Better to capture as many at-risk individuals as possible.
-
-As for the final output, I had an accuracy value of .74 with the Support Vector Classifier. This model was able to create a definite prediction regarding debilitating depression and anxiety. True positive and true negative values relative to their false counterparts were both nearly 75%. The f1 score was also superior to the other models at 12.6, which sounds terrible but it was a very small target in comparison with the overall sample. While there were a sizeable number of false positives, the model caught the majority of mentally ill individuals.
+As for the data, an accuracy value of .74 with the Support Vector Classifier, this model was able to create a definite prediction regarding debilitating depressioni and anxiety. True positive and true negative values relative to their false counterparts were both nearly 75%. While there were a sizeable number of false positives, the model caught the majority of mentally ill individuals, which I felt was the most important part of this report.
 
 With some strong tools and enough data, mental illness, and depression and anxiety in particular, can be predicted to a fairly strong extent based on economic factors and personal lifestyles. While it can't necessarily be ascertained which causes which -- whether, for example, individuals have difficulty maintining employment because they have debilitating depression and/or anxity or if they have debilitating depression and/or anxity because they are unemployed -- that distinction does not necessarily matter. While more research would need to be done to investigate and dissect unique factors (such as unemployment or poverty), a report such as this can be used as a tool to assist in determining which features to pursue, as well as carving out segments of the popoulation that are more likely to be at risk and allocating budgets for mental health intervention appropriately.
 
 Further, because so many of the most important factors were economic in nature, it may be indicative of the need to address poverty issues one way or another. Whether poverty causes debilitating depression and anxiety or depression and anxiety cause poverty is beside the point; the reality is that these forms of mental illness exist under those circumstances, for one reason or another, and should be addressed accordingly.
 
-Though I am includeing below the top 50 most important features used in identifying debilitating depression and anxiety in this report, the individual variables should not be used on their own to make judgments about any particular aspect, especially if the correlation is close to center. This report is the culmination of 100 separate variables, and there is planty of margin for error in the details. For example, black race shows just left of center as being at less risk for debilitating depression and anxiety, while white race shows just to the right as being slightly more at risk for debilitating depression and anxiety. This is not an argument that racial injustice has been alleviated and people with African heritage have finally reached parity with those of Eurpoean heritage. The only question this report is equipped to answer is who is more at risk for debilitating depression and anxiety; any other arguments about relative happiness or well being are far beyong the scope of the data herein.
+Though I am includeing below the top 50 most important features used in identifying debilitating depression and anxiety in this report, the individual variables should not be used on their own to make judgments about any particular aspect, especially if the correlation is close to center. This report is the culmination of 100 separate variables, and there is planty of margin for error in the details. For example, black race shows just left of center as being at less risk for debilitating depression and anxiety, while white rice shows just to the right as being slightly more at risk for debilitating depression and anxiety. This is not an argument that racial injustice has been alleviated and people with African heritage have finally reached parity with those of Eurpoean heritage. The only question this report is equipped to answer is who is more at risk for debilitating depressin and anxiety; any other arguments about relative happiness or well being are far beyong the scope of the data herein.
 
 ## Important Feature Plot
 
