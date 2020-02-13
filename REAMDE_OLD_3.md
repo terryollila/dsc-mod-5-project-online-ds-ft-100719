@@ -53,9 +53,6 @@ import warnings
 warnings.filterwarnings("ignore")
 ```
 
-    Using TensorFlow backend.
-
-
 
 ```python
 pd.set_option('display.max_columns', 999)
@@ -152,7 +149,6 @@ def tree_builder(data, target, max_depth=None,
                                   index=X_train.columns)
         df_imp_export = df_importance.sort_values(ascending=False)
         df_importance = df_importance.sort_values(ascending=True).tail(10)
-#         df_importance.index = [labels[x] for x,y in df_importance]
         df_importance.plot(kind='barh', figsize=(8,10))
         plt.title('Most Important Features')
         plt.ylabel('Feature Name')
@@ -644,6 +640,429 @@ cat_scatter(cdc_combined['WEB_HOURS'], test_target, cut_last=True)
 
 ## Establish Best Features
 
+Performing one-hot encoding for categorical modeling.
+
+
+```python
+# The existing values must first be converted into integers in order to be encoded.
+cdc_combined = cdc_combined.astype(int)
+you_dummies = pd.get_dummies(cdc_combined, 
+                         columns=list(cdc_combined.columns),
+                         drop_first=False)
+```
+
+Will first fit a random forest model in order to obtain a ranked list of most important features.
+
+
+```python
+# Create the parameters for the grid search to consider.
+grid = {'criterion': ['gini', 'entropy'],
+                'max_depth': [7,8,9,10,11],
+                'min_samples_split': [2,5,10,15,20,30],
+                'min_samples_leaf': [2,5,10,15,20,30],
+                'max_features': [20,30,50,100]} 
+
+# Grid search will return a set of optimal parameters for the classifier to use.
+best_params_rf = grid_search(RandomForestClassifier, you_dummies, test_target, 
+                          grid, verbose=False, n_estimators=100)
+
+# Classifier returns best features to be used for the rest of the modeling,
+# helping to alleviate unnecessary dimensions.
+best_features_rfc = find_important_features(you_dummies, test_target, 
+                                            params=best_params_rf,
+                                            classifier=RandomForestClassifier)
+```
+
+    Mean Training Score: 79.58%
+    Mean Test Score: 71.15%
+    Best Parameter Combination Found During Grid Search:
+    {'criterion': 'gini', 'max_depth': 7, 'max_features': 30, 'min_samples_leaf': 2, 'min_samples_split': 20}
+
+
+Creating a correlation matrix in order to establish pos/neg metrics for the most important features.
+
+
+```python
+# Taking only top 100 features as defined by RFC above.
+trim_dummies = you_dummies[best_features_rfc.index[:100]]
+corr_dummies = pd.concat([you_dummies[best_features_rfc.index[:15]], 
+                          test_target], axis = 1)
+
+# Create a correlation matrix for determining pos/neg correlation for important
+# features. Sort by original importance.
+corr_dummies = corr_dummies.corr()
+corr_dummies['to_sort'] = abs(corr_dummies['AFLHCA17'])
+to_sort_df = corr_dummies[['AFLHCA17', 'to_sort']][:-1]
+corr_dummies
+```
+
+
+
+
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>ONEJOB_0</th>
+      <th>FSNAP_1</th>
+      <th>ONEJOB_2</th>
+      <th>WRKLYR4_0</th>
+      <th>INCGRP5_1</th>
+      <th>FSNAP_2</th>
+      <th>MBO_SPR1_1</th>
+      <th>FSRUNOUT_3</th>
+      <th>ASINBILL_4</th>
+      <th>MBO_MND1_1</th>
+      <th>CIGSDAY_0</th>
+      <th>ASINBILL_1</th>
+      <th>MODERATE_ACTIVITY_8</th>
+      <th>BMI_BIN_50</th>
+      <th>HOURS_SLEEP_8</th>
+      <th>AFLHCA17</th>
+      <th>to_sort</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>ONEJOB_0</th>
+      <td>1.000000</td>
+      <td>0.139907</td>
+      <td>-0.890320</td>
+      <td>-1.000000</td>
+      <td>0.260725</td>
+      <td>-0.140958</td>
+      <td>0.000915</td>
+      <td>-0.083440</td>
+      <td>0.059421</td>
+      <td>-0.058433</td>
+      <td>-0.000145</td>
+      <td>0.048282</td>
+      <td>-0.039309</td>
+      <td>0.011285</td>
+      <td>0.057012</td>
+      <td>0.085823</td>
+      <td>0.085823</td>
+    </tr>
+    <tr>
+      <th>FSNAP_1</th>
+      <td>0.139907</td>
+      <td>1.000000</td>
+      <td>-0.122505</td>
+      <td>-0.139907</td>
+      <td>0.353533</td>
+      <td>-0.994073</td>
+      <td>0.002036</td>
+      <td>-0.320934</td>
+      <td>-0.161472</td>
+      <td>-0.019139</td>
+      <td>-0.165247</td>
+      <td>0.212101</td>
+      <td>-0.065813</td>
+      <td>0.100248</td>
+      <td>-0.019116</td>
+      <td>0.114140</td>
+      <td>0.114140</td>
+    </tr>
+    <tr>
+      <th>ONEJOB_2</th>
+      <td>-0.890320</td>
+      <td>-0.122505</td>
+      <td>1.000000</td>
+      <td>0.890320</td>
+      <td>-0.236158</td>
+      <td>0.123406</td>
+      <td>-0.013200</td>
+      <td>0.077314</td>
+      <td>-0.044223</td>
+      <td>0.032435</td>
+      <td>-0.007532</td>
+      <td>-0.047123</td>
+      <td>0.027308</td>
+      <td>-0.009505</td>
+      <td>-0.043488</td>
+      <td>-0.082414</td>
+      <td>0.082414</td>
+    </tr>
+    <tr>
+      <th>WRKLYR4_0</th>
+      <td>-1.000000</td>
+      <td>-0.139907</td>
+      <td>0.890320</td>
+      <td>1.000000</td>
+      <td>-0.260725</td>
+      <td>0.140958</td>
+      <td>-0.000915</td>
+      <td>0.083440</td>
+      <td>-0.059421</td>
+      <td>0.058433</td>
+      <td>0.000145</td>
+      <td>-0.048282</td>
+      <td>0.039309</td>
+      <td>-0.011285</td>
+      <td>-0.057012</td>
+      <td>-0.085823</td>
+      <td>0.085823</td>
+    </tr>
+    <tr>
+      <th>INCGRP5_1</th>
+      <td>0.260725</td>
+      <td>0.353533</td>
+      <td>-0.236158</td>
+      <td>-0.260725</td>
+      <td>1.000000</td>
+      <td>-0.351563</td>
+      <td>0.008154</td>
+      <td>-0.277884</td>
+      <td>-0.150496</td>
+      <td>-0.025681</td>
+      <td>-0.126563</td>
+      <td>0.180663</td>
+      <td>-0.059859</td>
+      <td>0.045123</td>
+      <td>0.004442</td>
+      <td>0.089708</td>
+      <td>0.089708</td>
+    </tr>
+    <tr>
+      <th>FSNAP_2</th>
+      <td>-0.140958</td>
+      <td>-0.994073</td>
+      <td>0.123406</td>
+      <td>0.140958</td>
+      <td>-0.351563</td>
+      <td>1.000000</td>
+      <td>-0.001383</td>
+      <td>0.319773</td>
+      <td>0.162123</td>
+      <td>0.019483</td>
+      <td>0.163559</td>
+      <td>-0.211229</td>
+      <td>0.067309</td>
+      <td>-0.101360</td>
+      <td>0.018886</td>
+      <td>-0.112972</td>
+      <td>0.112972</td>
+    </tr>
+    <tr>
+      <th>MBO_SPR1_1</th>
+      <td>0.000915</td>
+      <td>0.002036</td>
+      <td>-0.013200</td>
+      <td>-0.000915</td>
+      <td>0.008154</td>
+      <td>-0.001383</td>
+      <td>1.000000</td>
+      <td>-0.022320</td>
+      <td>-0.015597</td>
+      <td>0.328137</td>
+      <td>0.009394</td>
+      <td>0.025080</td>
+      <td>0.046151</td>
+      <td>-0.000278</td>
+      <td>-0.008108</td>
+      <td>0.060662</td>
+      <td>0.060662</td>
+    </tr>
+    <tr>
+      <th>FSRUNOUT_3</th>
+      <td>-0.083440</td>
+      <td>-0.320934</td>
+      <td>0.077314</td>
+      <td>0.083440</td>
+      <td>-0.277884</td>
+      <td>0.319773</td>
+      <td>-0.022320</td>
+      <td>1.000000</td>
+      <td>0.251342</td>
+      <td>-0.002197</td>
+      <td>0.160895</td>
+      <td>-0.342797</td>
+      <td>0.048829</td>
+      <td>-0.087441</td>
+      <td>0.039007</td>
+      <td>-0.125366</td>
+      <td>0.125366</td>
+    </tr>
+    <tr>
+      <th>ASINBILL_4</th>
+      <td>0.059421</td>
+      <td>-0.161472</td>
+      <td>-0.044223</td>
+      <td>-0.059421</td>
+      <td>-0.150496</td>
+      <td>0.162123</td>
+      <td>-0.015597</td>
+      <td>0.251342</td>
+      <td>1.000000</td>
+      <td>-0.003460</td>
+      <td>0.095375</td>
+      <td>-0.293668</td>
+      <td>0.040438</td>
+      <td>-0.080410</td>
+      <td>0.079314</td>
+      <td>-0.079044</td>
+      <td>0.079044</td>
+    </tr>
+    <tr>
+      <th>MBO_MND1_1</th>
+      <td>-0.058433</td>
+      <td>-0.019139</td>
+      <td>0.032435</td>
+      <td>0.058433</td>
+      <td>-0.025681</td>
+      <td>0.019483</td>
+      <td>0.328137</td>
+      <td>-0.002197</td>
+      <td>-0.003460</td>
+      <td>1.000000</td>
+      <td>0.006538</td>
+      <td>0.004824</td>
+      <td>0.056295</td>
+      <td>-0.026347</td>
+      <td>-0.014717</td>
+      <td>0.064109</td>
+      <td>0.064109</td>
+    </tr>
+    <tr>
+      <th>CIGSDAY_0</th>
+      <td>-0.000145</td>
+      <td>-0.165247</td>
+      <td>-0.007532</td>
+      <td>0.000145</td>
+      <td>-0.126563</td>
+      <td>0.163559</td>
+      <td>0.009394</td>
+      <td>0.160895</td>
+      <td>0.095375</td>
+      <td>0.006538</td>
+      <td>1.000000</td>
+      <td>-0.124250</td>
+      <td>0.030230</td>
+      <td>0.011130</td>
+      <td>0.034154</td>
+      <td>-0.079784</td>
+      <td>0.079784</td>
+    </tr>
+    <tr>
+      <th>ASINBILL_1</th>
+      <td>0.048282</td>
+      <td>0.212101</td>
+      <td>-0.047123</td>
+      <td>-0.048282</td>
+      <td>0.180663</td>
+      <td>-0.211229</td>
+      <td>0.025080</td>
+      <td>-0.342797</td>
+      <td>-0.293668</td>
+      <td>0.004824</td>
+      <td>-0.124250</td>
+      <td>1.000000</td>
+      <td>-0.040640</td>
+      <td>0.058006</td>
+      <td>-0.043972</td>
+      <td>0.122220</td>
+      <td>0.122220</td>
+    </tr>
+    <tr>
+      <th>MODERATE_ACTIVITY_8</th>
+      <td>-0.039309</td>
+      <td>-0.065813</td>
+      <td>0.027308</td>
+      <td>0.039309</td>
+      <td>-0.059859</td>
+      <td>0.067309</td>
+      <td>0.046151</td>
+      <td>0.048829</td>
+      <td>0.040438</td>
+      <td>0.056295</td>
+      <td>0.030230</td>
+      <td>-0.040640</td>
+      <td>1.000000</td>
+      <td>-0.072885</td>
+      <td>0.006973</td>
+      <td>-0.028709</td>
+      <td>0.028709</td>
+    </tr>
+    <tr>
+      <th>BMI_BIN_50</th>
+      <td>0.011285</td>
+      <td>0.100248</td>
+      <td>-0.009505</td>
+      <td>-0.011285</td>
+      <td>0.045123</td>
+      <td>-0.101360</td>
+      <td>-0.000278</td>
+      <td>-0.087441</td>
+      <td>-0.080410</td>
+      <td>-0.026347</td>
+      <td>0.011130</td>
+      <td>0.058006</td>
+      <td>-0.072885</td>
+      <td>1.000000</td>
+      <td>-0.028578</td>
+      <td>0.049658</td>
+      <td>0.049658</td>
+    </tr>
+    <tr>
+      <th>HOURS_SLEEP_8</th>
+      <td>0.057012</td>
+      <td>-0.019116</td>
+      <td>-0.043488</td>
+      <td>-0.057012</td>
+      <td>0.004442</td>
+      <td>0.018886</td>
+      <td>-0.008108</td>
+      <td>0.039007</td>
+      <td>0.079314</td>
+      <td>-0.014717</td>
+      <td>0.034154</td>
+      <td>-0.043972</td>
+      <td>0.006973</td>
+      <td>-0.028578</td>
+      <td>1.000000</td>
+      <td>-0.038439</td>
+      <td>0.038439</td>
+    </tr>
+    <tr>
+      <th>AFLHCA17</th>
+      <td>0.085823</td>
+      <td>0.114140</td>
+      <td>-0.082414</td>
+      <td>-0.085823</td>
+      <td>0.089708</td>
+      <td>-0.112972</td>
+      <td>0.060662</td>
+      <td>-0.125366</td>
+      <td>-0.079044</td>
+      <td>0.064109</td>
+      <td>-0.079784</td>
+      <td>0.122220</td>
+      <td>-0.028709</td>
+      <td>0.049658</td>
+      <td>-0.038439</td>
+      <td>1.000000</td>
+      <td>1.000000</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+
+
 The below cell translates the feature names into sensible descriptions for plotting.
 
 
@@ -722,468 +1141,16 @@ labels = {'ASINBILL_1': 'Bills: Very Worried',
           'WEB_HOURS_1': 'Light Internet Use',
           'FM_ELDR_2': '2 Females over 65 in Household',
           'WEB_HOURS_5': 'Medium Internet Use',
-          'PAR_STAT_3': 'No Children in Household',
-          'ASINKNT_3': 'Close-Knit Neighborhood: Somewhat Disagree',
-          'YEARS_WORKED_50': '30+ Years at Present Job',
-          'ALC12MWK_0': 'Less than 1 Drink per Week',
-          'AWEBMTP_0': 'No Internet Use',
-          'FM_STRCP_11': 'Living Alone',
-          'REGION_2': 'Midwest',
-          'AWEBMTP_1': 'High E-Mail Use'
+          'PAR_STAT_3': 'No Children in Household'
          }
 ```
-
-Performing one-hot encoding for categorical modeling.
-
-
-```python
-# The existing values must first be converted into integers in order to be encoded.
-cdc_combined = cdc_combined.astype(int)
-you_dummies = pd.get_dummies(cdc_combined, 
-                         columns=list(cdc_combined.columns),
-                         drop_first=False)
-```
-
-Will first fit a random forest model in order to obtain a ranked list of most important features.
-
-
-```python
-# Create the parameters for the grid search to consider.
-grid = {'criterion': ['gini', 'entropy'],
-                'max_depth': [7,8,9,10,11],
-                'min_samples_split': [2,5,10,15,20,30],
-                'min_samples_leaf': [2,5,10,15,20,30],
-                'max_features': [20,30,50,100]} 
-
-# Grid search will return a set of optimal parameters for the classifier to use.
-best_params_rf = grid_search(RandomForestClassifier, you_dummies, test_target, 
-                          grid, verbose=False, n_estimators=100)
-
-# Classifier returns best features to be used for the rest of the modeling,
-# helping to alleviate unnecessary dimensions.
-best_features_rfc = find_important_features(you_dummies, test_target, 
-                                            params=best_params_rf,
-                                            classifier=RandomForestClassifier)
-```
-
-    Mean Training Score: 79.57%
-    Mean Test Score: 70.63%
-    Best Parameter Combination Found During Grid Search:
-    {'criterion': 'gini', 'max_depth': 10, 'max_features': 30, 'min_samples_leaf': 2, 'min_samples_split': 15}
-
-
-Creating a correlation matrix in order to establish pos/neg metrics for the most important features.
-
-
-```python
-# Taking only top 100 features as defined by RFC above.
-trim_dummies = you_dummies[best_features_rfc.index[:100]]
-corr_dummies = pd.concat([you_dummies[best_features_rfc.index[:15]], 
-                          test_target], axis = 1)
-
-# Create a correlation matrix for determining pos/neg correlation for important
-# features. Sort by original importance.
-corr_dummies = corr_dummies.corr()
-corr_dummies['to_sort'] = abs(corr_dummies['AFLHCA17'])
-to_sort_df = corr_dummies[['AFLHCA17', 'to_sort']][:-1]
-corr_dummies
-```
-
-
-
-
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-      <th>WRKLYR4_0</th>
-      <th>ONEJOB_0</th>
-      <th>ONEJOB_2</th>
-      <th>FSRUNOUT_3</th>
-      <th>FSNAP_1</th>
-      <th>FSNAP_2</th>
-      <th>MBO_SPR1_1</th>
-      <th>ASINBILL_4</th>
-      <th>CIGSDAY_0</th>
-      <th>MBO_MND1_1</th>
-      <th>INCGRP5_1</th>
-      <th>MODERATE_ACTIVITY_8</th>
-      <th>MBO_SPR1_2</th>
-      <th>MRACRPI2_1</th>
-      <th>ASINBILL_1</th>
-      <th>AFLHCA17</th>
-      <th>to_sort</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <th>WRKLYR4_0</th>
-      <td>1.000000</td>
-      <td>-1.000000</td>
-      <td>0.890320</td>
-      <td>0.083440</td>
-      <td>-0.139907</td>
-      <td>0.140958</td>
-      <td>-0.000915</td>
-      <td>-0.059421</td>
-      <td>0.000145</td>
-      <td>0.058433</td>
-      <td>-0.260725</td>
-      <td>0.039309</td>
-      <td>0.002430</td>
-      <td>0.004051</td>
-      <td>-0.048282</td>
-      <td>-0.085823</td>
-      <td>0.085823</td>
-    </tr>
-    <tr>
-      <th>ONEJOB_0</th>
-      <td>-1.000000</td>
-      <td>1.000000</td>
-      <td>-0.890320</td>
-      <td>-0.083440</td>
-      <td>0.139907</td>
-      <td>-0.140958</td>
-      <td>0.000915</td>
-      <td>0.059421</td>
-      <td>-0.000145</td>
-      <td>-0.058433</td>
-      <td>0.260725</td>
-      <td>-0.039309</td>
-      <td>-0.002430</td>
-      <td>-0.004051</td>
-      <td>0.048282</td>
-      <td>0.085823</td>
-      <td>0.085823</td>
-    </tr>
-    <tr>
-      <th>ONEJOB_2</th>
-      <td>0.890320</td>
-      <td>-0.890320</td>
-      <td>1.000000</td>
-      <td>0.077314</td>
-      <td>-0.122505</td>
-      <td>0.123406</td>
-      <td>-0.013200</td>
-      <td>-0.044223</td>
-      <td>-0.007532</td>
-      <td>0.032435</td>
-      <td>-0.236158</td>
-      <td>0.027308</td>
-      <td>0.012795</td>
-      <td>0.002100</td>
-      <td>-0.047123</td>
-      <td>-0.082414</td>
-      <td>0.082414</td>
-    </tr>
-    <tr>
-      <th>FSRUNOUT_3</th>
-      <td>0.083440</td>
-      <td>-0.083440</td>
-      <td>0.077314</td>
-      <td>1.000000</td>
-      <td>-0.320934</td>
-      <td>0.319773</td>
-      <td>-0.022320</td>
-      <td>0.251342</td>
-      <td>0.160895</td>
-      <td>-0.002197</td>
-      <td>-0.277884</td>
-      <td>0.048829</td>
-      <td>0.023907</td>
-      <td>0.109156</td>
-      <td>-0.342797</td>
-      <td>-0.125366</td>
-      <td>0.125366</td>
-    </tr>
-    <tr>
-      <th>FSNAP_1</th>
-      <td>-0.139907</td>
-      <td>0.139907</td>
-      <td>-0.122505</td>
-      <td>-0.320934</td>
-      <td>1.000000</td>
-      <td>-0.994073</td>
-      <td>0.002036</td>
-      <td>-0.161472</td>
-      <td>-0.165247</td>
-      <td>-0.019139</td>
-      <td>0.353533</td>
-      <td>-0.065813</td>
-      <td>-0.006851</td>
-      <td>-0.140650</td>
-      <td>0.212101</td>
-      <td>0.114140</td>
-      <td>0.114140</td>
-    </tr>
-    <tr>
-      <th>FSNAP_2</th>
-      <td>0.140958</td>
-      <td>-0.140958</td>
-      <td>0.123406</td>
-      <td>0.319773</td>
-      <td>-0.994073</td>
-      <td>1.000000</td>
-      <td>-0.001383</td>
-      <td>0.162123</td>
-      <td>0.163559</td>
-      <td>0.019483</td>
-      <td>-0.351563</td>
-      <td>0.067309</td>
-      <td>0.006886</td>
-      <td>0.141169</td>
-      <td>-0.211229</td>
-      <td>-0.112972</td>
-      <td>0.112972</td>
-    </tr>
-    <tr>
-      <th>MBO_SPR1_1</th>
-      <td>-0.000915</td>
-      <td>0.000915</td>
-      <td>-0.013200</td>
-      <td>-0.022320</td>
-      <td>0.002036</td>
-      <td>-0.001383</td>
-      <td>1.000000</td>
-      <td>-0.015597</td>
-      <td>0.009394</td>
-      <td>0.328137</td>
-      <td>0.008154</td>
-      <td>0.046151</td>
-      <td>-0.867767</td>
-      <td>-0.005682</td>
-      <td>0.025080</td>
-      <td>0.060662</td>
-      <td>0.060662</td>
-    </tr>
-    <tr>
-      <th>ASINBILL_4</th>
-      <td>-0.059421</td>
-      <td>0.059421</td>
-      <td>-0.044223</td>
-      <td>0.251342</td>
-      <td>-0.161472</td>
-      <td>0.162123</td>
-      <td>-0.015597</td>
-      <td>1.000000</td>
-      <td>0.095375</td>
-      <td>-0.003460</td>
-      <td>-0.150496</td>
-      <td>0.040438</td>
-      <td>0.084772</td>
-      <td>0.082322</td>
-      <td>-0.293668</td>
-      <td>-0.079044</td>
-      <td>0.079044</td>
-    </tr>
-    <tr>
-      <th>CIGSDAY_0</th>
-      <td>0.000145</td>
-      <td>-0.000145</td>
-      <td>-0.007532</td>
-      <td>0.160895</td>
-      <td>-0.165247</td>
-      <td>0.163559</td>
-      <td>0.009394</td>
-      <td>0.095375</td>
-      <td>1.000000</td>
-      <td>0.006538</td>
-      <td>-0.126563</td>
-      <td>0.030230</td>
-      <td>-0.006798</td>
-      <td>-0.006409</td>
-      <td>-0.124250</td>
-      <td>-0.079784</td>
-      <td>0.079784</td>
-    </tr>
-    <tr>
-      <th>MBO_MND1_1</th>
-      <td>0.058433</td>
-      <td>-0.058433</td>
-      <td>0.032435</td>
-      <td>-0.002197</td>
-      <td>-0.019139</td>
-      <td>0.019483</td>
-      <td>0.328137</td>
-      <td>-0.003460</td>
-      <td>0.006538</td>
-      <td>1.000000</td>
-      <td>-0.025681</td>
-      <td>0.056295</td>
-      <td>-0.274777</td>
-      <td>0.037566</td>
-      <td>0.004824</td>
-      <td>0.064109</td>
-      <td>0.064109</td>
-    </tr>
-    <tr>
-      <th>INCGRP5_1</th>
-      <td>-0.260725</td>
-      <td>0.260725</td>
-      <td>-0.236158</td>
-      <td>-0.277884</td>
-      <td>0.353533</td>
-      <td>-0.351563</td>
-      <td>0.008154</td>
-      <td>-0.150496</td>
-      <td>-0.126563</td>
-      <td>-0.025681</td>
-      <td>1.000000</td>
-      <td>-0.059859</td>
-      <td>-0.014603</td>
-      <td>-0.106460</td>
-      <td>0.180663</td>
-      <td>0.089708</td>
-      <td>0.089708</td>
-    </tr>
-    <tr>
-      <th>MODERATE_ACTIVITY_8</th>
-      <td>0.039309</td>
-      <td>-0.039309</td>
-      <td>0.027308</td>
-      <td>0.048829</td>
-      <td>-0.065813</td>
-      <td>0.067309</td>
-      <td>0.046151</td>
-      <td>0.040438</td>
-      <td>0.030230</td>
-      <td>0.056295</td>
-      <td>-0.059859</td>
-      <td>1.000000</td>
-      <td>-0.029193</td>
-      <td>0.048589</td>
-      <td>-0.040640</td>
-      <td>-0.028709</td>
-      <td>0.028709</td>
-    </tr>
-    <tr>
-      <th>MBO_SPR1_2</th>
-      <td>0.002430</td>
-      <td>-0.002430</td>
-      <td>0.012795</td>
-      <td>0.023907</td>
-      <td>-0.006851</td>
-      <td>0.006886</td>
-      <td>-0.867767</td>
-      <td>0.084772</td>
-      <td>-0.006798</td>
-      <td>-0.274777</td>
-      <td>-0.014603</td>
-      <td>-0.029193</td>
-      <td>1.000000</td>
-      <td>0.020819</td>
-      <td>-0.004358</td>
-      <td>-0.054335</td>
-      <td>0.054335</td>
-    </tr>
-    <tr>
-      <th>MRACRPI2_1</th>
-      <td>0.004051</td>
-      <td>-0.004051</td>
-      <td>0.002100</td>
-      <td>0.109156</td>
-      <td>-0.140650</td>
-      <td>0.141169</td>
-      <td>-0.005682</td>
-      <td>0.082322</td>
-      <td>-0.006409</td>
-      <td>0.037566</td>
-      <td>-0.106460</td>
-      <td>0.048589</td>
-      <td>0.020819</td>
-      <td>1.000000</td>
-      <td>-0.061926</td>
-      <td>0.022532</td>
-      <td>0.022532</td>
-    </tr>
-    <tr>
-      <th>ASINBILL_1</th>
-      <td>-0.048282</td>
-      <td>0.048282</td>
-      <td>-0.047123</td>
-      <td>-0.342797</td>
-      <td>0.212101</td>
-      <td>-0.211229</td>
-      <td>0.025080</td>
-      <td>-0.293668</td>
-      <td>-0.124250</td>
-      <td>0.004824</td>
-      <td>0.180663</td>
-      <td>-0.040640</td>
-      <td>-0.004358</td>
-      <td>-0.061926</td>
-      <td>1.000000</td>
-      <td>0.122220</td>
-      <td>0.122220</td>
-    </tr>
-    <tr>
-      <th>AFLHCA17</th>
-      <td>-0.085823</td>
-      <td>0.085823</td>
-      <td>-0.082414</td>
-      <td>-0.125366</td>
-      <td>0.114140</td>
-      <td>-0.112972</td>
-      <td>0.060662</td>
-      <td>-0.079044</td>
-      <td>-0.079784</td>
-      <td>0.064109</td>
-      <td>0.089708</td>
-      <td>-0.028709</td>
-      <td>-0.054335</td>
-      <td>0.022532</td>
-      <td>0.122220</td>
-      <td>1.000000</td>
-      <td>1.000000</td>
-    </tr>
-  </tbody>
-</table>
-</div>
-
-
 
 
 ```python
 # Creating list of labels from dictionary to apply to graph.
 to_sort_df = to_sort_df.iloc[::-1]
-# plot_labels = [labels[x] for x,y in to_sort_df.iterrows()]
-```
-
-
-```python
-df_importance = best_features_rfc.sort_values(ascending=True).tail(15)
 plot_labels = [labels[x] for x,y in to_sort_df.iterrows()]
-
-fig = plt.figure(figsize=(7, 12))
-ax = fig.add_subplot(111)
-fig.patch.set_facecolor((0,0,0,0))
-# ax.patch.set_facecolor((0,0,0,0))
-plt.barh(plot_labels, df_importance)
-plt.title('Most Important Features')
-plt.ylabel('Survey Question Description')
-plt.xlabel('Question Importance')
-ax.tick_params(axis='x', labelsize=16)
-ax.tick_params(axis='y', labelsize=16)
-plt.show()
 ```
-
-
-![png](output_61_0.png)
-
 
 The below graph will demonstrate positive or negative corralation between target and feature.
 
@@ -1191,23 +1158,22 @@ The below graph will demonstrate positive or negative corralation between target
 ```python
 # I'd like to have different colors for pos vs neg.
 to_sort_df['positive'] = to_sort_df['AFLHCA17'] > 0
-fig = plt.figure(figsize=(7,12))
-ax = fig.add_subplot(111)
-fig.patch.set_facecolor((0,0,0,0))
-# ax.patch.set_facecolor((0,0,0,0))
+plt.figure(figsize=(7,10))
+
+fig.patch.set_facecolor((1,1,1,1))
 font = {'color': 'white'}
 
 # plot_labels was established early in the exploration when using most important 
 # features to guide modeling.
 plt.barh(plot_labels, to_sort_df['AFLHCA17'], 
          color=to_sort_df.positive.map({True: 'green', False: 'orange'}), 
-         lw=1);
+         edgecolor='white', lw=1);
+
+
 
 plt.title('Correlation of 15 Most Important Features')
 plt.ylabel('Survey Question Description')
 plt.xlabel('Correlation of variable to Depression/Anxiety')
-ax.tick_params(axis='x', labelsize=16)
-ax.tick_params(axis='y', labelsize=16)
 plt.show();
 
 
@@ -1215,7 +1181,7 @@ plt.show();
 ```
 
 
-![png](output_63_0.png)
+![png](output_62_0.png)
 
 
 ## Individual Testing
@@ -1722,7 +1688,7 @@ test = tree_builder(tiny_test[:26311], test_target, params=best_params_xg,
 
 
 
-![png](output_72_1.png)
+![png](output_71_1.png)
 
 
     HOURS_SLEEP              0.444926
@@ -1736,7 +1702,7 @@ test = tree_builder(tiny_test[:26311], test_target, params=best_params_xg,
 
 
 
-![png](output_72_3.png)
+![png](output_71_3.png)
 
 
 # Modeling
@@ -1760,10 +1726,10 @@ best_params_dtc = grid_search(DecisionTreeClassifier, trim_dummies, test_target,
                           grid, verbose=False)
 ```
 
-    Mean Training Score: 72.81%
-    Mean Test Score: 74.55%
+    Mean Training Score: 72.74%
+    Mean Test Score: 68.00%
     Best Parameter Combination Found During Grid Search:
-    {'criterion': 'gini', 'max_depth': 6, 'max_features': 20, 'min_samples_leaf': 5, 'min_samples_split': 20}
+    {'criterion': 'entropy', 'max_depth': 8, 'max_features': 30, 'min_samples_leaf': 15, 'min_samples_split': 10}
 
 
 
@@ -1771,40 +1737,40 @@ best_params_dtc = grid_search(DecisionTreeClassifier, trim_dummies, test_target,
 tree_builder(trim_dummies, test_target, params=best_params_dtc)
 ```
 
-    Train Accuracy:  0.7399787158566867
-    Test Accuracy:  0.7341137123745819
-    Precision:  0.051587301587301584
-    Recall:  0.5449101796407185
-    f1_score:  0.09425168306576902
+    Train Accuracy:  0.6626970050169766
+    Test Accuracy:  0.6606871389480086
+    Precision:  0.0508916920400174
+    Recall:  0.7005988023952096
+    f1_score:  0.09489051094890512
     
-    AUC is :0.64
+    AUC is :0.68
 
 
 
-![png](output_78_1.png)
+![png](output_77_1.png)
 
 
-    INCGRP5_1              0.237729
-    WRKLYR4_0              0.129005
-    MBO_SPR1_1             0.095555
-    ASINBILL_4             0.051832
-    VIMGLASS_1             0.044599
-    MODERATE_ACTIVITY_8    0.038856
-    FSNAP_1                0.038434
-    MRACRPI2_2             0.032087
-    YEARS_WORKED_1         0.032026
-    YEARS_WORKED_15        0.026041
+    FSNAP_2                  0.202019
+    WRKLYR4_2                0.083993
+    MBO_SPR1_1               0.079041
+    ONEJOB_0                 0.062988
+    MBO_MND1_1               0.046803
+    FSRUNOUT_3               0.045223
+    MRACRPI2_1               0.037444
+    MODERATE_ACTIVITY_100    0.035658
+    ASISIF_0                 0.029627
+    FM_SIZE_1                0.026986
     dtype: float64
 
 
 
-![png](output_78_3.png)
+![png](output_77_3.png)
 
 
 
 
 
-![png](output_78_4.png)
+![png](output_77_4.png)
 
 
 
@@ -1825,10 +1791,10 @@ best_params_rf = grid_search(RandomForestClassifier, trim_dummies, test_target,
                           grid, verbose=False, n_estimators=100)
 ```
 
-    Mean Training Score: 76.78%
-    Mean Test Score: 70.33%
+    Mean Training Score: 76.62%
+    Mean Test Score: 71.04%
     Best Parameter Combination Found During Grid Search:
-    {'criterion': 'entropy', 'max_depth': 8, 'max_features': 20, 'min_samples_leaf': 2, 'min_samples_split': 2}
+    {'criterion': 'entropy', 'max_depth': 8, 'max_features': 20, 'min_samples_leaf': 2, 'min_samples_split': 10}
 
 
 
@@ -1838,34 +1804,34 @@ best_features_rfc = tree_builder(trim_dummies, test_target,
                                  classifier=RandomForestClassifier)
 ```
 
-    Train Accuracy:  0.705011908984949
-    Test Accuracy:  0.7014290057768319
-    Precision:  0.05934281510544385
-    Recall:  0.7245508982035929
-    f1_score:  0.10970081595648233
+    Train Accuracy:  0.7214311052551563
+    Test Accuracy:  0.7146549103070842
+    Precision:  0.06063720452209661
+    Recall:  0.7065868263473054
+    f1_score:  0.11168954093705633
     
     AUC is :0.71
 
 
 
-![png](output_82_1.png)
+![png](output_81_1.png)
 
 
-    WRKLYR4_0     0.038643
-    ONEJOB_0      0.038425
-    ONEJOB_2      0.033497
-    FSRUNOUT_3    0.032599
-    FSNAP_1       0.029871
-    FSNAP_2       0.029580
-    MBO_SPR1_1    0.021947
-    ASINBILL_4    0.021763
-    CIGSDAY_0     0.020793
-    MBO_MND1_1    0.019488
+    ONEJOB_0      0.048666
+    FSNAP_1       0.034362
+    ONEJOB_2      0.034311
+    WRKLYR4_0     0.028879
+    INCGRP5_1     0.028834
+    FSNAP_2       0.028325
+    MBO_SPR1_1    0.026456
+    FSRUNOUT_3    0.025344
+    ASINBILL_4    0.024452
+    MBO_MND1_1    0.023479
     dtype: float64
 
 
 
-![png](output_82_3.png)
+![png](output_81_3.png)
 
 
 ### XGBoost Model with Grid Search
@@ -1884,8 +1850,8 @@ best_params_xg = grid_search(XGBClassifier, trim_dummies, test_target, grid,
                           verbose=False, n_estimators=50, scoring='accuracy')
 ```
 
-    Mean Training Score: 76.27%
-    Mean Test Score: 71.68%
+    Mean Training Score: 76.23%
+    Mean Test Score: 71.71%
     Best Parameter Combination Found During Grid Search:
     {'criterion': 'gini', 'gamma': 5, 'max_depth': 3, 'max_features': 30}
 
@@ -1897,34 +1863,34 @@ best_features = tree_builder(trim_dummies, test_target, params=best_params_xg,
              classifier=XGBClassifier)
 ```
 
-    Train Accuracy:  0.7172756296559063
-    Test Accuracy:  0.7166311948920645
-    Precision:  0.06013478486262312
+    Train Accuracy:  0.716566158212132
+    Test Accuracy:  0.7170872605655214
+    Precision:  0.060228452751817235
     Recall:  0.6946107784431138
-    f1_score:  0.11068702290076336
+    f1_score:  0.11084567606306736
     
     AUC is :0.71
 
 
 
-![png](output_85_1.png)
+![png](output_84_1.png)
 
 
-    FSRUNOUT_3    0.067764
-    ONEJOB_0      0.067572
-    INCGRP5_1     0.065155
-    FSNAP_2       0.036770
-    FM_ELDR_0     0.031508
-    ASINBILL_4    0.027961
-    FM_ELDR_2     0.026497
-    CIGSDAY_0     0.026302
-    MBO_MND1_1    0.024847
-    ONEJOB_2      0.023802
+    WRKLYR4_0     0.076152
+    FSRUNOUT_3    0.069124
+    INCGRP5_1     0.052336
+    FM_ELDR_2     0.043366
+    FSNAP_2       0.034605
+    ASINBILL_4    0.031904
+    CIGSDAY_0     0.027383
+    MBO_MND1_1    0.027180
+    FM_ELDR_0     0.025769
+    ASINBILL_1    0.024286
     dtype: float32
 
 
 
-![png](output_85_3.png)
+![png](output_84_3.png)
 
 
 ### Support Vector Classifier
@@ -1948,10 +1914,10 @@ best_params_svc = grid_search(SVC, trim_dummies, test_target,
                           grid, verbose=False, scoring='accuracy')
 ```
 
-    Mean Training Score: 82.58%
-    Mean Test Score: 72.80%
+    Mean Training Score: 82.08%
+    Mean Test Score: 74.63%
     Best Parameter Combination Found During Grid Search:
-    {'C': 5, 'gamma': 'auto', 'kernel': 'sigmoid'}
+    {'C': 6, 'gamma': 'auto', 'kernel': 'sigmoid'}
 
 
 
@@ -1966,28 +1932,29 @@ tree_builder(trim_dummies, test_target, params=best_params_svc,
              classifier=SVC)
 ```
 
-    Train Accuracy:  0.7300967921755435
-    Test Accuracy:  0.728032836728489
-    Precision:  0.06538049303322616
-    Recall:  0.7305389221556886
-    f1_score:  0.12001967535661585
+    Train Accuracy:  0.743323366948766
+    Test Accuracy:  0.746275463666768
+    Precision:  0.06938073394495413
+    Recall:  0.7245508982035929
+    f1_score:  0.12663526949241236
     
     AUC is :0.79
 
 
 
-![png](output_92_1.png)
+![png](output_91_1.png)
 
 
 
-![png](output_92_2.png)
+![png](output_91_2.png)
 
 
 ### K Nearest Neighbors
 
 
 ```python
-knn_params = {'n_neighbors': [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]}
+# Backup params in case I don't want to re-run grid search.
+# knn_params = {'n_neighbors': [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]}
 ```
 
 
@@ -1996,10 +1963,10 @@ best_params_knn = grid_search(KNeighborsClassifier, trim_dummies, test_target,
                           knn_params, verbose=False, scoring='recall')
 ```
 
-    Mean Training Score: 67.65%
-    Mean Test Score: 65.87%
+    Mean Training Score: 67.32%
+    Mean Test Score: 62.87%
     Best Parameter Combination Found During Grid Search:
-    {'n_neighbors': 19}
+    {'n_neighbors': 17}
 
 
 
@@ -2008,17 +1975,17 @@ tree_builder(trim_dummies, test_target, params=best_params_knn,
              classifier=KNeighborsClassifier)
 ```
 
-    Train Accuracy:  0.7536107028834946
-    Test Accuracy:  0.7555487990270598
-    Precision:  0.06622516556291391
-    Recall:  0.6586826347305389
-    f1_score:  0.12035010940919039
+    Train Accuracy:  0.7788476156691836
+    Test Accuracy:  0.766798418972332
+    Precision:  0.06658211794546608
+    Recall:  0.6287425149700598
+    f1_score:  0.12041284403669725
     
-    AUC is :0.71
+    AUC is :0.7
 
 
 
-![png](output_96_1.png)
+![png](output_95_1.png)
 
 
 ## Side Targets
@@ -2061,10 +2028,10 @@ best_params_svc = grid_search(SVC, trim_dummies, target_bi,
                           grid, verbose=False, scoring='f1')
 ```
 
-    Mean Training Score: 65.62%
-    Mean Test Score: 6.35%
+    Mean Training Score: 65.61%
+    Mean Test Score: 6.09%
     Best Parameter Combination Found During Grid Search:
-    {'C': 5, 'gamma': 'auto', 'kernel': 'poly'}
+    {'C': 7, 'gamma': 'auto', 'kernel': 'poly'}
 
 
 
@@ -2080,21 +2047,21 @@ tree_builder(trim_dummies, target_bi, params=best_params_svc,
              classifier=SVC)
 ```
 
-    Train Accuracy:  0.3910707951147823
-    Test Accuracy:  0.3861356035269079
-    Precision:  0.03332522500608125
-    Recall:  0.681592039800995
-    f1_score:  0.06354359925788497
+    Train Accuracy:  0.4033851923174378
+    Test Accuracy:  0.3957129826695044
+    Precision:  0.031994047619047616
+    Recall:  0.6417910447761194
+    f1_score:  0.06094968107725018
     
     AUC is :0.52
 
 
 
-![png](output_107_1.png)
+![png](output_106_1.png)
 
 
 
-![png](output_107_2.png)
+![png](output_106_2.png)
 
 
 ### Kidney Problems
@@ -2123,10 +2090,10 @@ best_params_svc = grid_search(SVC, trim_dummies, target_kid,
                           grid, verbose=False, scoring='accuracy')
 ```
 
-    Mean Training Score: 72.15%
-    Mean Test Score: 56.64%
+    Mean Training Score: 72.00%
+    Mean Test Score: 50.61%
     Best Parameter Combination Found During Grid Search:
-    {'C': 6, 'gamma': 'auto', 'kernel': 'poly'}
+    {'C': 7, 'gamma': 'auto', 'kernel': 'linear'}
 
 
 
@@ -2135,21 +2102,21 @@ tree_builder(trim_dummies, target_kid, params=best_params_svc,
              classifier=SVC)
 ```
 
-    Train Accuracy:  0.5811584655146201
-    Test Accuracy:  0.5664335664335665
-    Precision:  0.021754636233951498
-    Recall:  0.3588235294117647
-    f1_score:  0.04102219233355749
+    Train Accuracy:  0.5131505599756753
+    Test Accuracy:  0.506080875646093
+    Precision:  0.02293151533932445
+    Recall:  0.43529411764705883
+    f1_score:  0.04356785398881366
     
-    AUC is :0.47
+    AUC is :0.45
 
 
 
-![png](output_113_1.png)
+![png](output_112_1.png)
 
 
 
-![png](output_113_2.png)
+![png](output_112_2.png)
 
 
 ### Heavy Drinking
@@ -2242,11 +2209,11 @@ tree_builder(trim_dummies, target_alc, params=best_params_svc,
 
 
 
-![png](output_123_1.png)
+![png](output_122_1.png)
 
 
 
-![png](output_123_2.png)
+![png](output_122_2.png)
 
 
 # Conclusions
@@ -2257,15 +2224,11 @@ There were five models generated for the target data of individuals classified a
 
 As for the final output, I had an accuracy value of .74 with the Support Vector Classifier. This model was able to create a definite prediction regarding debilitating depression and anxiety. True positive and true negative values relative to their false counterparts were both nearly 75%. The f1 score was also superior to the other models at 12.6, which sounds terrible but it was a very small target in comparison with the overall sample. While there were a sizeable number of false positives, the model caught the majority of mentally ill individuals.
 
-With some strong tools and enough data, mental illness, and depression and anxiety in particular, can be predicted to a fairly strong extent based on economic factors and personal lifestyles. While it can't necessarily be ascertained which causes which -- whether, for example, individuals have difficulty maintaining employment because they have debilitating depression and/or anxity or if they have debilitating depression and/or anxity because they are unemployed -- that distinction does not necessarily matter. While more research would need to be done to investigate and dissect unique factors (such as unemployment or poverty), a report such as this can be used as a tool to assist in determining which features to pursue, as well as carving out segments of the popoulation that are more likely to be at risk and allocating budgets for mental health intervention appropriately.
+With some strong tools and enough data, mental illness, and depression and anxiety in particular, can be predicted to a fairly strong extent based on economic factors and personal lifestyles. While it can't necessarily be ascertained which causes which -- whether, for example, individuals have difficulty maintining employment because they have debilitating depression and/or anxity or if they have debilitating depression and/or anxity because they are unemployed -- that distinction does not necessarily matter. While more research would need to be done to investigate and dissect unique factors (such as unemployment or poverty), a report such as this can be used as a tool to assist in determining which features to pursue, as well as carving out segments of the popoulation that are more likely to be at risk and allocating budgets for mental health intervention appropriately.
 
 Further, because so many of the most important factors were economic in nature, it may be indicative of the need to address poverty issues one way or another. Whether poverty causes debilitating depression and anxiety or depression and anxiety cause poverty is beside the point; the reality is that these forms of mental illness exist under those circumstances, for one reason or another, and should be addressed accordingly.
 
 Though I am includeing below the top 50 most important features used in identifying debilitating depression and anxiety in this report, the individual variables should not be used on their own to make judgments about any particular aspect, especially if the correlation is close to center. This report is the culmination of 100 separate variables, and there is planty of margin for error in the details. For example, black race shows just left of center as being at less risk for debilitating depression and anxiety, while white race shows just to the right as being slightly more at risk for debilitating depression and anxiety. This is not an argument that racial injustice has been alleviated and people with African heritage have finally reached parity with those of Eurpoean heritage. The only question this report is equipped to answer is who is more at risk for debilitating depression and anxiety; any other arguments about relative happiness or well being are far beyong the scope of the data herein.
-
-## Recommendations
-
-There are two important things to consider given these conclusions. One is that we can identify those individuals who are most at risk for debilitating depression and anxiety, especially those in low economic status. This can guide decision-makers in allocating mental health resources to those areas most in need. The other side is that, knowing that poverty plays some part in these diseases, find the means to alleviate that poverty in our society.
 
 ## Important Feature Plot
 
@@ -2309,5 +2272,10 @@ plt.show()
 ```
 
 
-![png](output_131_0.png)
+![png](output_128_0.png)
 
+
+
+```python
+
+```
