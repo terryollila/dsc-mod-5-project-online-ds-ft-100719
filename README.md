@@ -1,3 +1,11 @@
+**Related links for this project:**
+
+Blog Post:
+<https://terryollila.github.io/repetitive_model_fitting_in_classification>
+
+Video Presentation:
+<https://vimeo.com/389112659>
+
 
 ## Final Project Submission
 
