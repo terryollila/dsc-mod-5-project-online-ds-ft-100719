@@ -6,17 +6,6 @@ Blog Post:
 Video Presentation:
 <https://vimeo.com/389112659>
 
-
-## Final Project Submission
-
-Please fill out:
-* Student name: Terry Ollila
-* Student pace: full time
-* Scheduled project review date/time: 2/11/2019 12pm
-* Instructor name: James Irving
-* Blog post URL: https://terryollila.github.io/repetitive_model_fitting_in_classification
-
-
 # Premise
 
 This analysis will explore a dataset from the 2017 National Health Interview Survey (NHIS) provided to the public by the Center for Disease Control and Prevention (CDC). The purpose is to create a means of predicting mental illness of debilitating depression and anxity based on numerous societal, personal, and economic factors as submitted by the American public to the CDC.
