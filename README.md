@@ -44,45 +44,5 @@ There are two important things to consider given these conclusions. One is that 
 
 ## Important Feature Plot
 
-
-```python
-# Put the target together with the original dummy set to establish correlation
-# for plotting.
-corr_dummies = pd.concat([you_dummies[best_features_rfc.index[:50]], 
-                          test_target], axis = 1)
-corr_dummies = corr_dummies.corr()
-corr_dummies['to_sort'] = abs(corr_dummies['AFLHCA17'])
-# Take everything but the target.
-to_sort_df = corr_dummies[['AFLHCA17', 'to_sort']][:-1]
-# Reverse the order for sorting
-to_sort_df = to_sort_df.iloc[::-1]
-plot_labels = [labels[x] for x,y in to_sort_df.iterrows()]
-```
-
-
-```python
-# I'd like to have different colors for pos vs neg.
-to_sort_df['positive'] = to_sort_df['AFLHCA17'] > 0
-fig = plt.figure(figsize=(10, 17))
-ax = fig.add_subplot(111)
-fig.patch.set_facecolor((0,0,0,0))
-
-# plot_labels was established early in the exploration when using most 
-# important features to guide modeling.
-plt.barh(plot_labels, to_sort_df['AFLHCA17'], 
-         color=to_sort_df.positive.map({True: 'green', False: 'orange'}), 
-                                        edgecolor='black', lw=1)
-plt.title('Correlation of 50 Most Important Features', color='black', fontsize=30)
-# ax.xaxis.label.set_color('white')
-# ax.yaxis.label.set_color('white')
-ax.tick_params(axis='x', colors='black', labelsize=16)
-ax.tick_params(axis='y', colors='black', labelsize=16)
-plt.xlabel('Correlation of Feature to Depression/Anxiety', color='black', 
-           fontsize=22)
-plt.ylabel('Survey Question Descripition', color='black', fontsize=25)
-plt.show()
-```
-
-
 ![png](output_131_0.png)
 
